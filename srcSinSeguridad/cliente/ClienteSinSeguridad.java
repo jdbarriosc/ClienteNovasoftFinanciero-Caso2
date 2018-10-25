@@ -72,6 +72,17 @@ public class ClienteSinSeguridad
 
 	public static void main(String[] args) throws Exception 
 	{
+		
+		String[]comandos=new String[7];
+		comandos[0]="HOLA";
+		comandos[1]="ALGORITMOS:AES:RSA:HMACMD5";
+		comandos[2]="Certificado del Cliente";
+		comandos[3]="OK";
+		comandos[4]="LS";
+		comandos[5]="\"Codigo de identificación de cuenta (Sólo numeros)\"";
+		comandos[6]="\"Codigo de identificacion HMACCMD5\"";
+
+		
 		boolean ejecutar = true;
 		Socket socket = null;
 		PrintWriter escritor = null;
@@ -94,22 +105,29 @@ public class ClienteSinSeguridad
 		String fromUser;
 
 		boolean vaAConsultar=false;
-
-		while (ejecutar)
+		int it=0;
+		while (ejecutar&&it<6)
 		{
-			System.out.print("Escriba el mensaje para enviar:");
+			System.out.println("Escriba el mensaje para enviar:");
+			System.out.println("Hint: "+comandos[it]);
+			it++;
 			fromUser = stdIn.readLine();
 			if (fromUser != null)
 			{
 				System.out.println("Cliente: " + fromUser);
-				
+				escritor.println(fromUser);
+
 				if(vaAConsultar)
 				{
-					escritor.println(fromUser);
-					System.out.print("Escriba el mensaje para enviar:");
+					System.out.println("Escriba el mensaje para enviar:");
+					System.out.println("Hint: "+comandos[it]);
+					it++;
 					fromUser = stdIn.readLine();
 					if (fromUser != null)
+					{
 						System.out.println("Cliente: " + fromUser);
+						escritor.println(fromUser);
+					}
 					else { 
 						System.out.println("ERROR");
 						return;
@@ -124,7 +142,6 @@ public class ClienteSinSeguridad
 					vaAConsultar=true;
 				
 
-				escritor.println(fromUser);
 			}
 			else { 
 				System.out.println("ERROR");
@@ -134,6 +151,7 @@ public class ClienteSinSeguridad
 				System.out.println("Servidor: " + fromServer);
 			
 		}
+		System.out.println("Fin de la transacción");
 		escritor.close();
 		lector.close();
 		// cierre el socket y la entrada estándar

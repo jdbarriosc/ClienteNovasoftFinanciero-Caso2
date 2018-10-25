@@ -135,17 +135,12 @@ public class Cliente
 
 					certificadoServidor=fromServer;
 					byte[] x509cert = DatatypeConverter.parseHexBinary(certificadoServidor);
-					//byte[] x509cert=certificateSerialization.getCertificateByte();
 
 					//from byte to x509
 
 					CertificateFactory certFactory = CertificateFactory.getInstance("X.509");
 					InputStream in = new ByteArrayInputStream(x509cert);
 					cert = (X509Certificate)certFactory.generateCertificate(in);
-					//					ByteArrayInputStream bis = new ByteArrayInputStream(x509cert);
-					//					ObjectInput in = new ObjectInputStream(bis);
-					//					X509Certificate cert = (X509Certificate) in.readObject(); 
-					//					bis.close();
 					pk = cert.getPublicKey();
 
 				}

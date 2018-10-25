@@ -1,7 +1,9 @@
 package cliente;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -9,9 +11,11 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.InvalidKeyException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -20,21 +24,31 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
+import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.DatatypeConverter;
 import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
 
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.asn1.pkcs.RSAPublicKey;
 import org.bouncycastle.asn1.x509.Certificate;
 import org.bouncycastle.cms.CMSAlgorithm;
 import org.bouncycastle.cms.CMSEnvelopedData;
@@ -70,6 +84,8 @@ public class Cliente
 
 	public static final BlockCipher engine = new DESEngine();
 
+	public static String ls = " ";
+
 	public static void main(String[] args) throws Exception 
 	{
 		boolean ejecutar = true;
@@ -102,6 +118,7 @@ public class Cliente
 		String certificadoServidor = " ";
 		String llaveSimetricaServidor = " ";
 		X509Certificate cert = null;
+		boolean vaAConsultar=false;
 
 		while (ejecutar)
 		{
@@ -109,8 +126,44 @@ public class Cliente
 			fromUser = stdIn.readLine();
 			if (fromUser != null)
 			{
+
+				if(fromUser.equals("1"))
+					fromUser="ALGORITMOS:AES:RSA:HMACMD5";
+				else if(fromUser.equals("2"))
+					fromUser="CERTIFICADO DEL CLIENTE";
 				System.out.println("Cliente: " + fromUser);
-				if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
+				if(vaAConsultar)
+				{
+					//					System.out.println(llaveSimetricaServidor);
+					//					byte[] publicBytes = DatatypeConverter.parseHexBinary(ls);
+					//					X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicBytes);
+					//					KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+					//					PublicKey pubKey = keyFactory.generatePublic(keySpec);
+
+					//					byte[] data = Base64.getDecoder().decode(llaveSimetricaServidor);
+					//					X509EncodedKeySpec spec = new X509EncodedKeySpec(data);
+					//					KeyFactory fact = KeyFactory.getInstance("RSA");
+					//					PublicKey pubKey = fact.generatePublic(spec);
+
+					// decode the base64 encoded string
+					//byte[] decodedKey = Base64.getDecoder().decode(ls);
+					// rebuild key using SecretKeySpec
+					byte[] decodedKey = DatatypeConverter.parseHexBinary(ls);
+					SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+
+
+					byte[] e = cifrarSimetrico(originalKey, fromUser);
+					System.out.println(e);
+					String consultaCifradaString = DatatypeConverter.printHexBinary(e);
+					escritor.println(consultaCifradaString);
+					System.out.println("Cliente (Consulta Cifrada): " + fromUser);
+					String hmac= hmacDigest(fromUser, originalKey);
+					System.out.println("Cliente (HMAC): " + hmac);
+					escritor.println(hmac);
+
+
+				}	
+				else if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
 				{
 					java.security.cert.X509Certificate certificado = generarCertificado(keyPair);
 					byte[] certificadoEnBytes = certificado.getEncoded( );
@@ -120,12 +173,13 @@ public class Cliente
 					System.out.println("Servidor: " + lector.readLine());
 					certificadoServidor="Va a llegar";
 				}
-				else
+				else 
 				{
 					if(fromUser.equalsIgnoreCase("OK"))
 						llaveSimetricaServidor="Va a llegar";
 					escritor.println(fromUser);
 				}
+
 
 			}
 			if ((fromServer = lector.readLine()) != null)
@@ -146,12 +200,14 @@ public class Cliente
 				}
 				else if(llaveSimetricaServidor.equals("Va a llegar"))
 				{
-					System.out.println("Servidor: " + fromServer);
+					System.out.println("Servidorholajuan: " + fromServer);
 					llaveSimetricaServidor=(descifrar(DatatypeConverter.parseHexBinary(fromServer), privateKey));
+					System.out.println("Llave después de descifrar: " + ls);
 					String resp=(DatatypeConverter.printHexBinary(cifrar(cert.getPublicKey(), llaveSimetricaServidor)));
 					System.out.println("Cliente: "+resp);
 					escritor.println(resp);
 					fromServer = lector.readLine();
+					vaAConsultar=true;
 				}
 				System.out.println("Servidor: " + fromServer);
 			}
@@ -216,7 +272,7 @@ public class Cliente
 			return null;
 		}
 	}
-	
+
 	public static final String descifrar(byte[] cipheredText, PrivateKey kp) throws Exception {
 		try {
 			// inicializa el cifrador
@@ -227,11 +283,92 @@ public class Cliente
 
 			byte[] clearText = cipher.doFinal(cipheredText);
 			String s3 = new String(clearText);
+			ls = DatatypeConverter.printHexBinary(clearText);
 			//System.out.println("clave original: " + s3);
 			return s3;
 		} catch (Exception e) {
 			System.out.println("Excepcion: " + e.getMessage());
 			throw new Exception(e.getMessage());
 		}
+	}
+
+	public static final byte [ ] sign ( String entrada, String key ) throws InvalidKeySpecException, NoSuchAlgorithmException
+	{
+
+		byte[] pBytes = DatatypeConverter.parseHexBinary(key);
+		PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(pBytes);
+		KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+		PrivateKey privKey = keyFactory.generatePrivate(keySpec);
+		Signature signature;
+
+		byte[] a = DatatypeConverter.parseHexBinary(entrada);
+
+		try
+		{
+			signature = Signature.getInstance ( "MD5withRSA" );
+			signature.initSign ( privKey );
+			signature.update(a);
+
+			return signature.sign ( );
+		}
+		catch ( Exception e )
+		{
+			e.printStackTrace ( );
+		}
+
+		return null;
+	}
+
+	public static byte[] cifrarSimetrico(SecretKey desKey, String entrada) {
+		byte[] cipheredText;
+		try {
+			Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+			System.out.println("1");
+
+			byte[] clearText = entrada.getBytes();
+			System.out.println("2");
+
+			String s1 = new String(clearText);
+			System.out.println("3");
+
+			//System.out.println("clave original: " + s1);
+
+			cipher.init(Cipher.ENCRYPT_MODE, desKey);
+			System.out.println("4");
+
+			cipheredText = cipher.doFinal(clearText);
+			System.out.println("5");
+
+			//			String s2 = new String(cipheredText);
+			//			System.out.println("clave cifrada: " + s2);
+			return cipheredText;
+		} catch (Exception e) {
+			System.out.println("Excepcion: " + e.getMessage());
+			return null;
+		}
+
+
+	}
+
+	public static String hmacDigest(String msg, SecretKey key) {
+		String digest = null;
+		try {
+			Mac mac = Mac.getInstance("HmacMD5");
+			mac.init(key);
+			byte[] bytes = mac.doFinal(msg.getBytes("ASCII"));
+			StringBuffer hash = new StringBuffer();
+			for (int i = 0; i < bytes.length; i++) {
+				String hex = Integer.toHexString(0xFF & bytes[i]);
+				if (hex.length() == 1) {
+					hash.append('0');
+				}
+				hash.append(hex);
+			}
+			digest = hash.toString();
+		} catch (UnsupportedEncodingException e) {
+		} catch (InvalidKeyException e) {
+		} catch (NoSuchAlgorithmException e) {
+		}
+		return digest;
 	}
 }

@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
 
+import javax.crypto.Cipher;
 import javax.xml.bind.DatatypeConverter;
 import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
 
@@ -69,7 +70,7 @@ public class Cliente
 
 	public static final BlockCipher engine = new DESEngine();
 
-	public static void main(String[] args) throws IOException, InvalidKeyException, IllegalStateException, NoSuchProviderException, NoSuchAlgorithmException, SignatureException, ParseException, ClassNotFoundException, CertificateException, CMSException 
+	public static void main(String[] args) throws Exception 
 	{
 		boolean ejecutar = true;
 		Socket socket = null;
@@ -151,8 +152,8 @@ public class Cliente
 				else if(llaveSimetricaServidor.equals("Va a llegar"))
 				{
 					System.out.println("Servidor: " + fromServer);
-					llaveSimetricaServidor=DatatypeConverter.printHexBinary(decryptData(DatatypeConverter.parseHexBinary(fromServer),privateKey));
-					String resp=(DatatypeConverter.printHexBinary(encryptData(DatatypeConverter.parseHexBinary(llaveSimetricaServidor),cert)));
+					llaveSimetricaServidor=(descifrar(DatatypeConverter.parseHexBinary(fromServer), privateKey));
+					String resp=(DatatypeConverter.printHexBinary(cifrar(cert.getPublicKey(), llaveSimetricaServidor)));
 					System.out.println("Cliente: "+resp);
 					escritor.println(resp);
 					fromServer = lector.readLine();
@@ -194,65 +195,48 @@ public class Cliente
 		return cert;
 	}
 
-	//	public static byte[] Encrypt(String keys, byte[] plainText) {
-	//        byte[] key = keys.getBytes();
-	//        byte[] ptBytes = plainText;
-	//        BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(engine));
-	//        cipher.init(true, new KeyParameter(key));
-	//        byte[] rv = new byte[cipher.getOutputSize(ptBytes.length)];
-	//        int tam = cipher.processBytes(ptBytes, 0, ptBytes.length, rv, 0);
-	//        try {
-	//            cipher.doFinal(rv, tam);
-	//        } catch (Exception ce) {
-	//            ce.printStackTrace();
-	//        }
-	//        return rv;
-	//    }
 
-	//    public static byte[] Decrypt(byte[] key2, byte[] cipherText) {
-	//        byte[] key = key2;
-	//        BufferedBlockCipher cipher = new PaddedBufferedBlockCipher(new CBCBlockCipher(engine));
-	//        cipher.init(false, new KeyParameter(key));
-	//        byte[] rv = new byte[cipher.getOutputSize(cipherText.length)];
-	//        int tam = cipher.processBytes(cipherText, 0, cipherText.length, rv, 0);
-	//        try {
-	//            cipher.doFinal(rv, tam);
-	//        } catch (Exception ce) {
-	//            ce.printStackTrace();
-	//        }
-	//        return rv;
-	//    }
+	public static final byte[] cifrar(PublicKey kp, String entrada) {
+		try {
+			// inicializa el cifrador
+			Cipher cipher = Cipher.getInstance("RSA");
 
-	public static byte[] decryptData(byte[] encryptedData, PrivateKey decryptionKey) throws CMSException
-	{
-		byte[] decryptedData = null;
-		if (null != encryptedData && null != decryptionKey)
-		{
-			CMSEnvelopedData envelopedData = new CMSEnvelopedData(encryptedData);
+			// lee del teclado lo que se va a cifrar
+			BufferedReader stdIn = new BufferedReader(new InputStreamReader(
+					System.in));
+			byte[] clearText = entrada.getBytes();
+			String s1 = new String(clearText);
+			//System.out.println("clave original: " + s1);
 
-			Collection<RecipientInformation> recipients = envelopedData.getRecipientInfos().getRecipients();
-			KeyTransRecipientInformation recipientInfo = (KeyTransRecipientInformation) recipients.iterator().next();
-			JceKeyTransRecipient recipient = new JceKeyTransEnvelopedRecipient(decryptionKey);
+			// asigna la llave publica para cifrar
+			cipher.init(Cipher.ENCRYPT_MODE, kp);
 
-			return recipientInfo.getContent(recipient);
+			byte[] cipheredText = cipher.doFinal(clearText);
+			//System.out.println("clave cifrada: " + cipheredText);
+
+			// retorna el texto cifrado
+			return cipheredText;
+		} catch (Exception e) {
+			System.err.println("Excepcion: " + e.getMessage());
+			return null;
 		}
-		return decryptedData;
 	}
+	
+	public static final String descifrar(byte[] cipheredText, PrivateKey kp) throws Exception {
+		try {
+			// inicializa el cifrador
+			Cipher cipher = Cipher.getInstance("RSA");
 
-	public static byte[] encryptData(byte[] data, X509Certificate encryptionCertificate) throws CertificateEncodingException, CMSException, IOException
-	{
-		byte[] encryptedData = null;
-		if (null != data && null != encryptionCertificate)
-		{
-			CMSEnvelopedDataGenerator cmsEnvelopedDataGenerator = new CMSEnvelopedDataGenerator();
+			// asigna la llave privada para descifrar
+			cipher.init(Cipher.DECRYPT_MODE, kp);
 
-			JceKeyTransRecipientInfoGenerator jceKey = new JceKeyTransRecipientInfoGenerator(encryptionCertificate);
-//			cmsEnvelopedDataGenerator.addRecipientInfoGenerator(transKeyGen);
-			CMSTypedData msg = new CMSProcessableByteArray(data);
-			OutputEncryptor encryptor = new JceCMSContentEncryptorBuilder(CMSAlgorithm.AES128_CBC).setProvider("BC").build();
-			CMSEnvelopedData cmsEnvelopedData = cmsEnvelopedDataGenerator.generate(msg,encryptor);
-			encryptedData = cmsEnvelopedData.getEncoded();
+			byte[] clearText = cipher.doFinal(cipheredText);
+			String s3 = new String(clearText);
+			//System.out.println("clave original: " + s3);
+			return s3;
+		} catch (Exception e) {
+			System.out.println("Excepcion: " + e.getMessage());
+			throw new Exception(e.getMessage());
 		}
-		return encryptedData;
 	}
 }

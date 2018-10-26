@@ -77,6 +77,7 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.OutputEncryptor;
 import org.bouncycastle.util.io.pem.PemReader;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
+import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 public class Cliente
 {
@@ -88,6 +89,12 @@ public class Cliente
 
 	public static void main(String[] args) throws Exception 
 	{
+		String[]comandos=new String[4];
+		comandos[0]="HOLA";
+		comandos[1]="ALGORITMOS:AES:RSA:HMACMD5";
+		comandos[2]="Certificado del Cliente";
+		comandos[3]="OK";
+		
 		boolean ejecutar = true;
 		Socket socket = null;
 		PrintWriter escritor = null;
@@ -119,38 +126,24 @@ public class Cliente
 		String llaveSimetricaServidor = " ";
 		X509Certificate cert = null;
 		boolean vaAConsultar=false;
-
-		while (ejecutar)
+		int it=0;
+		while (ejecutar&&it<5)
 		{
-			System.out.print("Escriba el mensaje para enviar:");
+			if(it<3)
+				System.out.println("Escriba el mensaje para enviar (Hint:"+comandos[it]+") :");
+			else
+				System.out.println("Ingrese el código de identificación de cuenta (Número Entero) :");
+
+			it++;
 			fromUser = stdIn.readLine();
 			if (fromUser != null)
 			{
 
-				if(fromUser.equals("1"))
-					fromUser="ALGORITMOS:AES:RSA:HMACMD5";
-				else if(fromUser.equals("2"))
-					fromUser="CERTIFICADO DEL CLIENTE";
 				System.out.println("Cliente: " + fromUser);
 				if(vaAConsultar)
 				{
-					//					System.out.println(llaveSimetricaServidor);
-					//					byte[] publicBytes = DatatypeConverter.parseHexBinary(ls);
-					//					X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicBytes);
-					//					KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-					//					PublicKey pubKey = keyFactory.generatePublic(keySpec);
-
-					//					byte[] data = Base64.getDecoder().decode(llaveSimetricaServidor);
-					//					X509EncodedKeySpec spec = new X509EncodedKeySpec(data);
-					//					KeyFactory fact = KeyFactory.getInstance("RSA");
-					//					PublicKey pubKey = fact.generatePublic(spec);
-
-					// decode the base64 encoded string
-					//byte[] decodedKey = Base64.getDecoder().decode(ls);
-					// rebuild key using SecretKeySpec
 					byte[] decodedKey = DatatypeConverter.parseHexBinary(ls);
 					SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
-
 
 					byte[] e = cifrarSimetrico(originalKey, fromUser);
 					System.out.println(e);
@@ -160,8 +153,6 @@ public class Cliente
 					String hmac= hmacDigest(fromUser, originalKey);
 					System.out.println("Cliente (HMAC): " + hmac);
 					escritor.println(hmac);
-
-
 				}	
 				else if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
 				{
@@ -232,7 +223,7 @@ public class Cliente
 		BigInteger serialNumber = BigInteger.valueOf(1l);     // serial number for certificate
 
 		@SuppressWarnings("deprecation")
-		X509V1CertificateGenerator certGen = new X509V1CertificateGenerator();
+		X509V3CertificateGenerator certGen = new X509V3CertificateGenerator();
 		@SuppressWarnings("deprecation")
 		X509Principal dnName = new X509Principal("CN=Test CA Certificate");
 		certGen.setSerialNumber(serialNumber);

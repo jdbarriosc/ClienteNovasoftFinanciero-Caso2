@@ -129,9 +129,9 @@ public class Cliente
 		int it=0;
 		while (ejecutar&&it<5)
 		{
-			if(it<3)
+			if(it<=3)
 				System.out.println("Escriba el mensaje para enviar (Hint:"+comandos[it]+") :");
-			else
+			else if(it==4)
 				System.out.println("Ingrese el código de identificación de cuenta (Número Entero) :");
 
 			it++;
@@ -159,7 +159,8 @@ public class Cliente
 					java.security.cert.X509Certificate certificado = generarCertificado(keyPair);
 					byte[] certificadoEnBytes = certificado.getEncoded( );
 					String certificadoEnString = DatatypeConverter.printHexBinary(certificadoEnBytes);
-
+					System.out.println("Cliente: "+certificadoEnString);
+					
 					escritor.println(certificadoEnString);
 					System.out.println("Servidor: " + lector.readLine());
 					certificadoServidor="Va a llegar";

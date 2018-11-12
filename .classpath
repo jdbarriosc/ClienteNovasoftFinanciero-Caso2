@@ -4,5 +4,9 @@
 	<classpathentry kind="src" path="srcSinSeguridad"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
 	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.USER_LIBRARY/libreriaCaso2"/>
+	<classpathentry kind="lib" path="C:/Users/jdbar/Downloads/srvcifIC201820/librerias/bcpg-jdk15on-155.jar"/>
+	<classpathentry kind="lib" path="C:/Users/jdbar/Downloads/srvcifIC201820/librerias/bcpkix-jdk15on-155.jar"/>
+	<classpathentry kind="lib" path="C:/Users/jdbar/Downloads/srvcifIC201820/librerias/bcprov-jdk15on-155.jar"/>
+	<classpathentry kind="lib" path="C:/Users/jdbar/Downloads/GLoad 1.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

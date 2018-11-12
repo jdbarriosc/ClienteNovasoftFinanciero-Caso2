@@ -9,6 +9,7 @@ import java.io.ObjectInput;
 import java.io.ObjectInputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
+import java.lang.management.ManagementFactory;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.InvalidKeyException;
@@ -31,6 +32,10 @@ import java.util.Collection;
 import java.util.Date;
 
 import javax.crypto.Cipher;
+import javax.management.Attribute;
+import javax.management.AttributeList;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import javax.xml.bind.DatatypeConverter;
 import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
 
@@ -67,12 +72,19 @@ import org.bouncycastle.x509.X509V1CertificateGenerator;
 public class ClienteSinSeguridad
 {
 	public static final String DIRECCION = "localhost";
+//	public static final String DIRECCION = "192.168.0.17";
+	public static int contadorTransacciones=0;
+	public static long sumaTiemposVerificacion=0l;
+	public static long sumaTiemposConsulta=0l;
+	public static double cantTomadaCpu=0;
+	public static double sumaTiempoCpu=0;
+
+
 
 	public static final BlockCipher engine = new DESEngine();
 
-	public static void main(String[] args) throws Exception 
+	public ClienteSinSeguridad() throws Exception 
 	{
-		
 		String[]comandos=new String[7];
 		comandos[0]="HOLA";
 		comandos[1]="ALGORITMOS:AES:RSA:HMACMD5";
@@ -81,13 +93,14 @@ public class ClienteSinSeguridad
 		comandos[4]="LS";
 		comandos[5]="\"Codigo de identificación de cuenta (Sólo numeros)\"";
 		comandos[6]="\"Codigo de identificacion HMACCMD5\"";
+		long tiempoVerificacion=0l;
+		long tiempoConsulta=0l;
 
-		
 		boolean ejecutar = true;
 		Socket socket = null;
 		PrintWriter escritor = null;
 		BufferedReader lector = null;
-
+	
 		try
 		{
 			socket = new Socket(DIRECCION, 8080);
@@ -108,47 +121,72 @@ public class ClienteSinSeguridad
 		int it=0;
 		while (ejecutar&&it<6)
 		{
+			getSystemCpuLoad();
+
 			System.out.println("Escriba el mensaje para enviar:");
 			System.out.println("Hint: "+comandos[it]);
+			if(it<=4)
+				fromUser = comandos[it];
+			else 
+				fromUser = ((int)(Math.random()*500))+"";
 			it++;
-			fromUser = stdIn.readLine();
+
+		
 			if (fromUser != null)
 			{
+				
 				System.out.println("Cliente: " + fromUser);
 				escritor.println(fromUser);
+			
+				
+				if(fromUser.equalsIgnoreCase("OK")&&it==4) {
+					tiempoVerificacion = System.currentTimeMillis();
+					System.out.println("Empezo a tomar el tiempo");
 
-				if(vaAConsultar)
+				}
+				else if(vaAConsultar)
 				{
+					tiempoConsulta = System.currentTimeMillis();
+					System.out.println("Empezo a tomar el tiempo");
+
 					System.out.println("Escriba el mensaje para enviar:");
 					System.out.println("Hint: "+comandos[it]);
+					fromUser = ((int)(Math.random()*500))+"";
 					it++;
-					fromUser = stdIn.readLine();
-					if (fromUser != null)
-					{
-						System.out.println("Cliente: " + fromUser);
-						escritor.println(fromUser);
-					}
-					else { 
-						System.out.println("ERROR");
-						return;
-					}
-						
-					
+					System.out.println("Cliente: " + fromUser);
+					escritor.println(fromUser);	
 				}
-				
 				else if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
 					System.out.println("Servidor: " + lector.readLine());
 				else if(fromUser.equalsIgnoreCase("LS"))
 					vaAConsultar=true;
-				
+				getSystemCpuLoad();
+
 
 			}
 			else { 
 				System.out.println("ERROR");
 				return;
 			}
-			if ((fromServer = lector.readLine()) != null)
+			fromServer = lector.readLine();
+			if (fromServer != null) {
+				
+				if(fromServer.equals("OK")&&tiempoVerificacion!=0l) {
+					tiempoVerificacion = System.currentTimeMillis()-tiempoVerificacion;
+					sumaTiemposVerificacion+=tiempoVerificacion;
+					System.out.println("Tiempo en verificar: "+tiempoVerificacion+" milisegundos");
+				}
+				if((fromServer.startsWith("OK")||fromServer.startsWith("ERROR"))&&tiempoConsulta!=0l) {
+					tiempoConsulta = System.currentTimeMillis()-tiempoConsulta;
+					sumaTiemposConsulta+=tiempoConsulta;
+					System.out.println("Tiempo en consultar: "+tiempoConsulta+" milisegundos");
+					contadorTransacciones++;
+
+				}
+				getSystemCpuLoad();
+
 				System.out.println("Servidor: " + fromServer);
+			}
 			
 		}
 		System.out.println("Fin de la transacción");
@@ -157,7 +195,24 @@ public class ClienteSinSeguridad
 		// cierre el socket y la entrada estándar
 		socket.close();
 		stdIn.close();
-	}
+	
 
+	}
+	
+	
+	public double getSystemCpuLoad() throws Exception {
+		 MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+		 ObjectName name = ObjectName.getInstance("java.lang:type=OperatingSystem");
+		 AttributeList list = mbs.getAttributes(name, new String[]{ "SystemCpuLoad" });
+		 if (list.isEmpty()) return Double.NaN;
+		 Attribute att = (Attribute)list.get(0);
+		 Double value = (Double)att.getValue();
+		 // usually takes a couple of seconds before we get real values
+		 if (value == -1.0) return Double.NaN;
+		 // returns a percentage value with 1 decimal point precision
+		 sumaTiempoCpu+=((int)(value * 1000) / 10.0);
+		 cantTomadaCpu++;
+		 return ((int)(value * 1000) / 10.0);
+		 }
 	
 }

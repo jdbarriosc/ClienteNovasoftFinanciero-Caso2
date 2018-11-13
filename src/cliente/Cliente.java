@@ -1,17 +1,12 @@
 package cliente;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.ObjectInput;
-import java.io.ObjectInputStream;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
+import java.lang.management.ManagementFactory;
 import java.math.BigInteger;
 import java.net.Socket;
 import java.security.InvalidKeyException;
@@ -23,78 +18,60 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
-import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.security.cert.CertificateEncodingException;
-import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Base64;
-import java.util.Collection;
 import java.util.Date;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import javax.management.Attribute;
+import javax.management.AttributeList;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 import javax.xml.bind.DatatypeConverter;
-import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
 
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.asn1.pkcs.RSAPublicKey;
-import org.bouncycastle.asn1.x509.Certificate;
-import org.bouncycastle.cms.CMSAlgorithm;
-import org.bouncycastle.cms.CMSEnvelopedData;
-import org.bouncycastle.cms.CMSEnvelopedDataGenerator;
-import org.bouncycastle.cms.CMSException;
-import org.bouncycastle.cms.CMSProcessableByteArray;
-import org.bouncycastle.cms.CMSTypedData;
-import org.bouncycastle.cms.KeyTransRecipientInformation;
-import org.bouncycastle.cms.RecipientInformation;
-import org.bouncycastle.cms.jcajce.JceCMSContentEncryptorBuilder;
-import org.bouncycastle.cms.jcajce.JceKeyTransEnvelopedRecipient;
-import org.bouncycastle.cms.jcajce.JceKeyTransRecipient;
-import org.bouncycastle.cms.jcajce.JceKeyTransRecipientInfoGenerator;
+
 import org.bouncycastle.crypto.BlockCipher;
-import org.bouncycastle.crypto.BufferedBlockCipher;
-import org.bouncycastle.crypto.KeyParser;
 import org.bouncycastle.crypto.engines.DESEngine;
-import org.bouncycastle.crypto.modes.CBCBlockCipher;
-import org.bouncycastle.crypto.paddings.PaddedBufferedBlockCipher;
-import org.bouncycastle.crypto.params.KeyParameter;
-import org.bouncycastle.crypto.util.PrivateKeyInfoFactory;
-import org.bouncycastle.jcajce.provider.asymmetric.rsa.BCRSAPrivateCrtKey;
 import org.bouncycastle.jce.X509Principal;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.operator.OutputEncryptor;
-import org.bouncycastle.util.io.pem.PemReader;
 import org.bouncycastle.x509.X509V1CertificateGenerator;
 import org.bouncycastle.x509.X509V3CertificateGenerator;
 
 public class Cliente
 {
 	public static final String DIRECCION = "localhost";
+	//	public static final String DIRECCION = "192.168.0.17";
+	public static int contadorTransacciones=0;
+	public static long sumaTiemposVerificacion=0l;
+	public static long sumaTiemposConsulta=0l;
+	public static double cantTomadaCpu=0;
+	public static double sumaTiempoCpu=0;
+
 
 	public static final BlockCipher engine = new DESEngine();
 
 	public static String ls = " ";
 
-	public static void main(String[] args) throws Exception 
+	public Cliente() throws Exception 
 	{
 		String[]comandos=new String[4];
 		comandos[0]="HOLA";
 		comandos[1]="ALGORITMOS:AES:RSA:HMACMD5";
 		comandos[2]="Certificado del Cliente";
 		comandos[3]="OK";
-		
+		long tiempoVerificacion=-1l;
+		long tiempoConsulta=-1l;
+
 		boolean ejecutar = true;
 		Socket socket = null;
 		PrintWriter escritor = null;
@@ -114,7 +91,7 @@ public class Cliente
 
 		BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
 		String fromServer = " ";
-		String fromUser;
+		String fromUser="";
 
 		KeyPairGenerator rsa = KeyPairGenerator.getInstance("RSA", new BouncyCastleProvider());
 		rsa.initialize(1024,new SecureRandom());
@@ -129,53 +106,70 @@ public class Cliente
 		int it=0;
 		while (ejecutar&&it<5)
 		{
-			if(it<=3)
+			getSystemCpuLoad();
+
+			if(it<=3) {
 				System.out.println("Escriba el mensaje para enviar (Hint:"+comandos[it]+") :");
-			else if(it==4)
-				System.out.println("Ingrese el código de identificación de cuenta (Número Entero) :");
-
-			it++;
-			fromUser = stdIn.readLine();
-			if (fromUser != null)
-			{
-
-				System.out.println("Cliente: " + fromUser);
-				if(vaAConsultar)
-				{
-					byte[] decodedKey = DatatypeConverter.parseHexBinary(ls);
-					SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
-
-					byte[] e = cifrarSimetrico(originalKey, fromUser);
-					System.out.println(e);
-					String consultaCifradaString = DatatypeConverter.printHexBinary(e);
-					escritor.println(consultaCifradaString);
-					System.out.println("Cliente (Consulta Cifrada): " + fromUser);
-					String hmac= hmacDigest(fromUser, originalKey);
-					System.out.println("Cliente (HMAC): " + hmac);
-					escritor.println(hmac);
-				}	
-				else if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
-				{
-					java.security.cert.X509Certificate certificado = generarCertificado(keyPair);
-					byte[] certificadoEnBytes = certificado.getEncoded( );
-					String certificadoEnString = DatatypeConverter.printHexBinary(certificadoEnBytes);
-					System.out.println("Cliente: "+certificadoEnString);
-					
-					escritor.println(certificadoEnString);
-					System.out.println("Servidor: " + lector.readLine());
-					certificadoServidor="Va a llegar";
-				}
-				else 
-				{
-					if(fromUser.equalsIgnoreCase("OK"))
-						llaveSimetricaServidor="Va a llegar";
-					escritor.println(fromUser);
-				}
-
-
+				fromUser = comandos[it];
 			}
+			else if(it==4) {
+				System.out.println("Ingrese el código de identificación de cuenta (Número Entero) :");
+				fromUser = ((int)(Math.random()*500))+"";
+			}
+			it++;
+
+			System.out.println("Cliente: " + fromUser);
+			if(vaAConsultar)
+			{
+				byte[] decodedKey = DatatypeConverter.parseHexBinary(ls);
+				SecretKey originalKey = new SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+
+				byte[] e = cifrarSimetrico(originalKey, fromUser);
+				System.out.println(e);
+				String consultaCifradaString = DatatypeConverter.printHexBinary(e);
+				escritor.println(consultaCifradaString);
+				tiempoConsulta = System.currentTimeMillis();
+				System.out.println("Cliente (Consulta Cifrada): " + fromUser);
+				System.out.println("Empezo a tomar el tiempo");
+				String hmac= hmacDigest(fromUser, originalKey);
+				System.out.println("Cliente (HMAC): " + hmac);
+				escritor.println(hmac);
+			}	
+			else if(fromUser.equalsIgnoreCase("Certificado del Cliente"))
+			{
+				java.security.cert.X509Certificate certificado = generarCertificado(keyPair);
+				byte[] certificadoEnBytes = certificado.getEncoded( );
+				String certificadoEnString = DatatypeConverter.printHexBinary(certificadoEnBytes);
+				System.out.println("Cliente: "+certificadoEnString);
+
+				escritor.println(certificadoEnString);
+				System.out.println("Servidor: " + lector.readLine());
+				certificadoServidor="Va a llegar";
+			}
+			else 
+			{
+				escritor.println(fromUser);
+				if(fromUser.equalsIgnoreCase("OK")) {
+					tiempoVerificacion = System.currentTimeMillis();
+					System.out.println("Empezo a tomar el tiempo");
+					llaveSimetricaServidor="Va a llegar";
+				}
+			}
+
+
+
 			if ((fromServer = lector.readLine()) != null)
 			{
+				
+				
+				if(fromServer.startsWith("OK")&&tiempoConsulta!=-1l) {
+					tiempoConsulta = System.currentTimeMillis()-tiempoConsulta;
+					sumaTiemposConsulta+=tiempoConsulta;
+					System.out.println("Tiempo en consultar: "+tiempoConsulta+" milisegundos");
+//					tiempoConsulta=-1l;
+
+					contadorTransacciones++;
+				}
 				if(certificadoServidor.equals("Va a llegar"))
 				{
 
@@ -192,7 +186,14 @@ public class Cliente
 				}
 				else if(llaveSimetricaServidor.equals("Va a llegar"))
 				{
-					System.out.println("Servidorholajuan: " + fromServer);
+					System.out.println("Servidor: " + fromServer);
+					if(fromServer.equalsIgnoreCase("ERROR"))
+					{
+//						if(tiempoVerificacion!=-1l) 
+//							sumaTiemposVerificacion-=tiempoVerificacion;
+						System.out.println("Termina ejecución por error!");
+						break;
+					}
 					llaveSimetricaServidor=(descifrar(DatatypeConverter.parseHexBinary(fromServer), privateKey));
 					System.out.println("Llave después de descifrar: " + ls);
 					String resp=(DatatypeConverter.printHexBinary(cifrar(cert.getPublicKey(), llaveSimetricaServidor)));
@@ -201,14 +202,33 @@ public class Cliente
 					fromServer = lector.readLine();
 					vaAConsultar=true;
 				}
+				
 				System.out.println("Servidor: " + fromServer);
+				if(fromServer.equals("OK")&&tiempoVerificacion!=-1l) {
+					tiempoVerificacion = System.currentTimeMillis()-tiempoVerificacion;
+					sumaTiemposVerificacion+=tiempoVerificacion;
+					System.out.println("Tiempo en verificar: "+tiempoVerificacion+" milisegundos");
+//					tiempoVerificacion=-1l;
+
+				}
+				else if(fromServer.equalsIgnoreCase("ERROR"))
+				{
+//					if(tiempoVerificacion!=-1l)
+//						sumaTiemposVerificacion-=tiempoVerificacion;
+					System.out.println("Termina ejecución por error!");
+					break;
+				}
 			}
 		}
+		System.out.println("Termino la transaccion!");
+
+	
 		escritor.close();
 		lector.close();
 		// cierre el socket y la entrada estándar
 		socket.close();
 		stdIn.close();
+		
 	}
 
 	private static X509Certificate generarCertificado(KeyPair keyPair) throws CertificateEncodingException, InvalidKeyException, IllegalStateException, NoSuchProviderException, NoSuchAlgorithmException, SignatureException, ParseException {
@@ -284,7 +304,7 @@ public class Cliente
 		}
 	}
 
-	public static final byte [ ] sign ( String entrada, String key ) throws InvalidKeySpecException, NoSuchAlgorithmException
+	public byte [ ] sign ( String entrada, String key ) throws InvalidKeySpecException, NoSuchAlgorithmException
 	{
 
 		byte[] pBytes = DatatypeConverter.parseHexBinary(key);
@@ -300,6 +320,8 @@ public class Cliente
 			signature = Signature.getInstance ( "MD5withRSA" );
 			signature.initSign ( privKey );
 			signature.update(a);
+			getSystemCpuLoad();
+
 
 			return signature.sign ( );
 		}
@@ -315,22 +337,11 @@ public class Cliente
 		byte[] cipheredText;
 		try {
 			Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-			System.out.println("1");
-
 			byte[] clearText = entrada.getBytes();
-			System.out.println("2");
-
 			String s1 = new String(clearText);
-			System.out.println("3");
-
 			//System.out.println("clave original: " + s1);
-
 			cipher.init(Cipher.ENCRYPT_MODE, desKey);
-			System.out.println("4");
-
 			cipheredText = cipher.doFinal(clearText);
-			System.out.println("5");
-
 			//			String s2 = new String(cipheredText);
 			//			System.out.println("clave cifrada: " + s2);
 			return cipheredText;
@@ -357,10 +368,31 @@ public class Cliente
 				hash.append(hex);
 			}
 			digest = hash.toString();
+			getSystemCpuLoad();
+
 		} catch (UnsupportedEncodingException e) {
 		} catch (InvalidKeyException e) {
 		} catch (NoSuchAlgorithmException e) {
+		} catch (Exception e) {
 		}
 		return digest;
 	}
+	
+	
+	
+	public static double getSystemCpuLoad() throws Exception {
+		 MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
+		 ObjectName name = ObjectName.getInstance("java.lang:type=OperatingSystem");
+		 AttributeList list = mbs.getAttributes(name, new String[]{ "SystemCpuLoad" });
+		 if (list.isEmpty()) return Double.NaN;
+		 Attribute att = (Attribute)list.get(0);
+		 Double value = (Double)att.getValue();
+		 // usually takes a couple of seconds before we get real values
+		 if (value == -1.0) return Double.NaN;
+		 // returns a percentage value with 1 decimal point precision
+		 sumaTiempoCpu+=((int)(value * 1000) / 10.0);
+		 cantTomadaCpu++;
+		 return ((int)(value * 1000) / 10.0);
+		 }
+	
 }

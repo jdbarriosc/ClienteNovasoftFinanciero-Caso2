@@ -93,8 +93,9 @@ public class ClienteSinSeguridad
 		comandos[4]="LS";
 		comandos[5]="\"Codigo de identificación de cuenta (Sólo numeros)\"";
 		comandos[6]="\"Codigo de identificacion HMACCMD5\"";
-		long tiempoVerificacion=0l;
-		long tiempoConsulta=0l;
+
+		long tiempoVerificacion=-1l;
+		long tiempoConsulta=-1l;
 
 		boolean ejecutar = true;
 		Socket socket = null;
@@ -119,6 +120,7 @@ public class ClienteSinSeguridad
 
 		boolean vaAConsultar=false;
 		int it=0;
+		
 		while (ejecutar&&it<6)
 		{
 			getSystemCpuLoad();
@@ -171,15 +173,18 @@ public class ClienteSinSeguridad
 			fromServer = lector.readLine();
 			if (fromServer != null) {
 				
-				if(fromServer.equals("OK")&&tiempoVerificacion!=0l) {
+				if(fromServer.equals("OK")&&tiempoVerificacion!=-1l) {
 					tiempoVerificacion = System.currentTimeMillis()-tiempoVerificacion;
 					sumaTiemposVerificacion+=tiempoVerificacion;
 					System.out.println("Tiempo en verificar: "+tiempoVerificacion+" milisegundos");
+					tiempoVerificacion=-1l;
+
 				}
-				if((fromServer.startsWith("OK")||fromServer.startsWith("ERROR"))&&tiempoConsulta!=0l) {
+				if((fromServer.startsWith("OK")||fromServer.startsWith("ERROR"))&&tiempoConsulta!=-1l) {
 					tiempoConsulta = System.currentTimeMillis()-tiempoConsulta;
 					sumaTiemposConsulta+=tiempoConsulta;
 					System.out.println("Tiempo en consultar: "+tiempoConsulta+" milisegundos");
+					tiempoConsulta=-1l;
 					contadorTransacciones++;
 
 				}
@@ -196,7 +201,7 @@ public class ClienteSinSeguridad
 		socket.close();
 		stdIn.close();
 	
-
+		
 	}
 	
 	
